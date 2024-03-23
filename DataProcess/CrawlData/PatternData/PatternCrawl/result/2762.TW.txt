@@ -1,0 +1,149 @@
+2762.TW
+Pattern Recognition Name: CDL2CROWS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDL3BLACKCROWS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDL3INSIDE
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDL3LINESTRIKE
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDL3OUTSIDE
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDL3STARSINSOUTH
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDL3WHITESOLDIERS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLABANDONEDBABY
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLADVANCEBLOCK
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLBELTHOLD
+2024-02-20 00:00:00 : 100
+2024-03-06 00:00:00 : 100
+2024-03-11 00:00:00 : 100
+2024-03-15 00:00:00 : 100
+2024-03-19 00:00:00 : -100
+2024-03-22 00:00:00 : 100
+Pattern Recognition Name: CDLBREAKAWAY
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLCLOSINGMARUBOZU
+2024-03-06 00:00:00 : 100
+2024-03-07 00:00:00 : 100
+2024-03-18 00:00:00 : 100
+Pattern Recognition Name: CDLCONCEALBABYSWALL
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLCOUNTERATTACK
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLDARKCLOUDCOVER
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLDOJI
+2024-02-23 00:00:00 : 100
+2024-02-29 00:00:00 : 100
+2024-03-05 00:00:00 : 100
+2024-03-21 00:00:00 : 100
+Pattern Recognition Name: CDLDOJISTAR
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLDRAGONFLYDOJI
+2024-02-29 00:00:00 : 100
+Pattern Recognition Name: CDLENGULFING
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLEVENINGDOJISTAR
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLEVENINGSTAR
+2024-03-13 00:00:00 : -100
+Pattern Recognition Name: CDLGAPSIDESIDEWHITE
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLGRAVESTONEDOJI
+2024-02-23 00:00:00 : 100
+2024-03-21 00:00:00 : 100
+Pattern Recognition Name: CDLHAMMER
+2024-02-22 00:00:00 : 100
+Pattern Recognition Name: CDLHANGINGMAN
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLHARAMI
+2024-02-21 00:00:00 : -100
+Pattern Recognition Name: CDLHARAMICROSS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLHIGHWAVE
+2024-03-05 00:00:00 : 100
+2024-03-14 00:00:00 : 100
+Pattern Recognition Name: CDLHIKKAKE
+2024-02-01 00:00:00 : -100
+2024-02-05 00:00:00 : -200
+2024-02-19 00:00:00 : -100
+2024-02-22 00:00:00 : 100
+2024-03-01 00:00:00 : -100
+2024-03-04 00:00:00 : -200
+2024-03-12 00:00:00 : -100
+Pattern Recognition Name: CDLHIKKAKEMOD
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLHOMINGPIGEON
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLIDENTICAL3CROWS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLINNECK
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLINVERTEDHAMMER
+2024-03-04 00:00:00 : 100
+Pattern Recognition Name: CDLKICKING
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLKICKINGBYLENGTH
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLLADDERBOTTOM
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLLONGLEGGEDDOJI
+2024-02-23 00:00:00 : 100
+2024-02-29 00:00:00 : 100
+2024-03-05 00:00:00 : 100
+2024-03-21 00:00:00 : 100
+Pattern Recognition Name: CDLLONGLINE
+2024-02-20 00:00:00 : 100
+2024-03-06 00:00:00 : 100
+2024-03-13 00:00:00 : -100
+Pattern Recognition Name: CDLMARUBOZU
+2024-03-06 00:00:00 : 100
+Pattern Recognition Name: CDLMATCHINGLOW
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLMATHOLD
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLMORNINGDOJISTAR
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLMORNINGSTAR
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLONNECK
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLPIERCING
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLRICKSHAWMAN
+2024-03-05 00:00:00 : 100
+Pattern Recognition Name: CDLRISEFALL3METHODS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLSEPARATINGLINES
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLSHOOTINGSTAR
+2024-03-12 00:00:00 : -100
+Pattern Recognition Name: CDLSHORTLINE
+2024-02-19 00:00:00 : 100
+2024-02-29 00:00:00 : 100
+2024-03-05 00:00:00 : 100
+Pattern Recognition Name: CDLSPINNINGTOP
+2024-03-05 00:00:00 : 100
+2024-03-14 00:00:00 : 100
+Pattern Recognition Name: CDLSTALLEDPATTERN
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLSTICKSANDWICH
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLTAKURI
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLTASUKIGAP
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLTHRUSTING
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLTRISTAR
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLUNIQUE3RIVER
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLUPSIDEGAP2CROWS
+期間內無觸發此型態訊號
+Pattern Recognition Name: CDLXSIDEGAP3METHODS
+2024-03-13 00:00:00 : 100

@@ -1,0 +1,4 @@
+Pattern: CDLCLOSINGMARUBOZU, Explanation: 收盤光頭光腳 - 類似於光頭光腳，但專指收盤價極為強勢或弱勢的情況，是一方力量的明顯展現。
+Stock: 3231.TW, Signal: 100, Time: 09:00:00
+
+
