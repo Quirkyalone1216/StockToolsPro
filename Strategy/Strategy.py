@@ -1,6 +1,7 @@
 from Function.chkData import chkData
 from Function.Cal_estimate_volumes import CalEstimatedVolumes
 from Function.All_Estimate_Volumes import AllEstimateVolumes
+from SelectStock.SelectStock_ShortTerm import ShortTerm
 
 
 def main():
@@ -15,7 +16,9 @@ def main():
     fifteen_mins_new = r"D:\Temp\StockData\TW_STOCK_DATA\EstimatedVolumes_15Min_K"
     CalEstimatedVolumes(fifteen_mins_path, fifteen_mins_new)
 
-    AllEstimateVolumes(fifteen_mins_new)
+    allEstimateVol = AllEstimateVolumes(fifteen_mins_new)
+
+    met_shortTerm_stock = ShortTerm(daily_path, allEstimateVol)
 
 
 if __name__ == '__main__':
