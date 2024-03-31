@@ -38,9 +38,9 @@ def TrainDataSplit(process_data_path, bytes_of_size, base_dir):
     target_size_limit = bytes_of_size * 1024 * 1024  # 600MB in bytes
     target_dir_prefix = "ProcessData"
 
-    # 列出所有CSV檔案，並篩選掉小於20KB的檔案
+    # 列出所有CSV檔案，並篩選掉小於100KB的檔案
     csv_files = [os.path.join(root, file) for root, dirs, files in os.walk(process_data_path) for file in files if
-                 file.endswith('.csv') and get_file_size(os.path.join(root, file)) >= 20480]
+                 file.endswith('.csv') and get_file_size(os.path.join(root, file)) >= 102400]
 
     # 隨機打亂檔案順序
     random.shuffle(csv_files)

@@ -20,12 +20,8 @@ def process_csv_file_cpu(file_path, region):
     earliest_date = data['Date'].min()
     data['DaysFromStart'] = (data['Date'] - earliest_date).dt.days
 
-    # Pattern encoding
-    label_encoder = LabelEncoder()
-    encoded = label_encoder.fit_transform(data['Pattern'])  # Fallback to pandas
-
     # 要移除的Column(台股、美股)
-    common_columns_to_drop = ['Date', 'Pattern', 'Dividends', 'Stock Splits']
+    common_columns_to_drop = ['Date', 'Dividends', 'Stock Splits']
     us_specific_columns = ['Symbol', 'Capital Gains']
     tw_specific_columns = ['Adj Close', 'Shares Outstanding']
 
@@ -43,7 +39,13 @@ def process_csv_file_cpu(file_path, region):
     # 排除開盤價數值為0的數據
     data = data[data['Open'] != 0]
 
+    # Pattern encoding
+    label_encoder = LabelEncoder()
+    encoded = label_encoder.fit_transform(data['Pattern'])  # Fallback to pandas
+    data['Pattern'] = encoded
+
     return data
+
 
 def DropColumns(merged_data_dir, processed_data_dir, region):
     """
