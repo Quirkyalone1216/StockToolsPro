@@ -65,5 +65,6 @@ def add_estimated_volumes_to_csv(data_path, newCsvPath):
 # print(f"Updated CSV file saved to: {updated_csv_path}")
 
 def CalEstimatedVolumes(data_path, new_data_path):
-    os.makedirs(new_data_path, exist_ok=False)
+    if not os.path.exists(new_data_path):
+        os.makedirs(new_data_path)
     add_estimated_volumes_to_csv(data_path, new_data_path)
