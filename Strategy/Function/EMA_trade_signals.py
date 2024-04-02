@@ -1,5 +1,6 @@
 import pandas as pd
 import os
+import csv
 
 
 def calculate_ema_profit(df, ema_span):
@@ -62,12 +63,19 @@ def generate_trade_signals(df, ema_span):
     return trades
 
 
-def trade_signals(dataPath, log_file_path):
-    stockFileList = os.listdir(dataPath)
-    results = []
+def trade_signals(dataPath, log_file_path, csv_file_path):
+    # 初始化日誌文件
     with open(log_file_path, 'w') as log_file:
         log_file.write('')
 
+    # 初始化 CSV 文件並寫入表頭
+    with open(csv_file_path, 'w', newline='') as csv_file:
+        csv_writer = csv.writer(csv_file)
+        csv_writer.writerow(['Stock', 'Best_EMA_Span', 'Interval_Profit', 'Cumulative_Profit'])
+
+    # 遍歷股票文件並處理
+    stockFileList = os.listdir(dataPath)
+    results = []
     for stock_file in stockFileList:
         file_path = os.path.join(dataPath, stock_file)
         df_stock = pd.read_csv(file_path)
@@ -91,12 +99,23 @@ def trade_signals(dataPath, log_file_path):
 
         results.append(stock_info)
 
-        # 開啟日誌文件以附加模式寫入日誌
+        # 寫入 CSV 文件
+        with open(csv_file_path, 'a', newline='') as csv_file:
+            csv_writer = csv.writer(csv_file)
+            csv_writer.writerow([stock_info['Stock'], stock_info['Best_EMA_Span'], stock_info['Interval_Profit'],
+                                 stock_info['Cumulative_Profit']])
+
+        # 寫入日誌文件和打印信息
         with open(log_file_path, 'a') as log_file:
             log_file.write(f"股票名稱: {stock_info['Stock']}\n")
             log_file.write(f"最佳EMA跨度: {stock_info['Best_EMA_Span']}\n")
             log_file.write(f"間隔利潤: {stock_info['Interval_Profit']}\n")
             log_file.write(f"累計利潤: {stock_info['Cumulative_Profit']}\n")
+
+            print(f"股票名稱: {stock_info['Stock']}")
+            print(f"最佳EMA跨度: {stock_info['Best_EMA_Span']}")
+            print(f"間隔利潤: {stock_info['Interval_Profit']}")
+            print(f"累計利潤: {stock_info['Cumulative_Profit']}")
 
             total_profit = 0
             for signal in tradeSignals[-10:]:
@@ -115,14 +134,14 @@ def trade_signals(dataPath, log_file_path):
 def EMA_Strategy(dataPath):
     # 處理所有股票檔案並收集信息
     log_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\trade_signals_log.txt"
-    results = trade_signals(dataPath, log_file_path)
+    csv_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\stock_ema_results.csv"  # 新增的 CSV 檔案路徑
+    results = trade_signals(dataPath, log_file_path, csv_file_path)  # 將 CSV 檔案路徑傳遞給 trade_signals()
 
-    # 轉換為DataFrame並按區間利潤排序
+    # 轉換為 DataFrame 並按區間利潤排序
     df_results = pd.DataFrame(results)
     df_sorted = df_results.sort_values(by='Interval_Profit', ascending=False)
 
-    # 儲存到CSV檔案
-    csv_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\stock_ema_results.csv"
+    # 儲存到 CSV 檔案
     df_sorted.to_csv(csv_file_path, index=False)
 
-    print(csv_file_path, df_sorted.head())  # 返回CSV檔案路徑和前幾行數據進行檢查
+    print(csv_file_path, df_sorted.head())  # 返回 CSV 檔案路徑和前幾行數據進行檢查
