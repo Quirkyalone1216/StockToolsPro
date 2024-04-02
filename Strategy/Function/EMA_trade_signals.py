@@ -46,11 +46,9 @@ def generate_trade_signals(df, ema_span):
     df['Pct_from_EMA'] = (df['Close'] - df['EMA']) / df['EMA'] * 100
     df['Buy'] = ((df['Pct_from_EMA'] > 3) | ((df['Pct_from_EMA'] > 1) & (df['Pct_from_EMA'].shift(1) > 1)))
     df['Sell'] = ((df['Pct_from_EMA'] < -3) | ((df['Pct_from_EMA'] < -1) & (df['Pct_from_EMA'].shift(1) < -1)))
-
     in_position = False
     buy_price = 0.0
     trades = []
-
     for date, row in df.iterrows():
         if row['Buy'] and not in_position:
             in_position = True
@@ -61,6 +59,14 @@ def generate_trade_signals(df, ema_span):
             profit = sell_price - buy_price
             trades.append({'Date': date, 'Action': 'Sell', 'Price': sell_price, 'Profit': profit})
             in_position = False
+
+    # Handle the case where the last action was a buy without a corresponding sell
+    if in_position:
+        # Assuming the last close price as the sell price
+        last_close_price = df.iloc[-1]['Close']
+        profit = last_close_price - buy_price
+        last_date = df.index[-1]
+        trades.append({'Date': last_date, 'Action': 'Sell', 'Price': last_close_price, 'Profit': profit})
 
     return trades
 
