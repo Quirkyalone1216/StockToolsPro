@@ -4,7 +4,7 @@ from Function.chkData import chkData
 from Function.Cal_estimate_volumes import CalEstimatedVolumes
 from Function.All_Estimate_Volumes import AllEstimateVolumes
 from SelectStock.SelectStock_ShortTerm import ShortTerm
-from Function.EMA_trade_signals import trade_signals
+from Function.EMA_trade_signals import EMA_Strategy
 
 
 def main():
@@ -24,7 +24,7 @@ def main():
     # met_shortTerm_stock = ShortTerm(daily_path, allEstimateVol)
 
     signalsDataPath = r"D:\Temp\StockData\TW_STOCK_DATA\trade_signal"
-    trade_signals(daily_path)
+    EMA_Strategy(daily_path)
 
 
 if __name__ == '__main__':
