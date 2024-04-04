@@ -1,147 +1,129 @@
 import pandas as pd
 import os
-import csv
 
 
-def calculate_ema_profit(df, ema_span):
+def load_data(file_path):
+    """從 CSV 檔案中讀取股票數據並轉換成 Pandas DataFrame 格式。"""
+    data = pd.read_csv(file_path)
+    return data
+
+
+def apply_strategy(data, ema_period):
     """
-    計算給定EMA跨度的累積盈利。
+    應用短期交易策略，計算指定天數的指數移動平均線（EMA）並根據條件生成買入和賣出信號。
+    新增短線最高未實現獲利回吐30%停利賣出條件。
     """
-    df['EMA'] = df['Close'].ewm(span=ema_span, adjust=False).mean()
-    df['Pct_from_EMA'] = (df['Close'] - df['EMA']) / df['EMA'] * 100
-    df['Buy'] = ((df['Pct_from_EMA'] > 3) | ((df['Pct_from_EMA'] > 1) & (df['Pct_from_EMA'].shift(1) > 1)))
-    df['Sell'] = ((df['Pct_from_EMA'] < -3) | ((df['Pct_from_EMA'] < -1) & (df['Pct_from_EMA'].shift(1) < -1)))
+    ema = data['Close'].ewm(span=ema_period, adjust=False).mean()
+    data['EMA'] = ema
 
-    in_position = False
-    buy_price = 0.0
-    cumulative_profit = 0.0
-    shares = 1000  # 假设每次交易1000股
+    # 初始化買入、賣出信號和最高價
+    data['Buy_Signal'] = False
+    data['Sell_Signal'] = False
+    highest_price = 0  # 最高未實現獲利價格
 
-    for _, row in df.iterrows():
-        if row['Buy'] and not in_position:
-            in_position = True
-            buy_price = row['Close']
-        elif row['Sell'] and in_position:
-            sell_price = row['Close']
-            profit_per_share = sell_price - buy_price
-            cumulative_profit += profit_per_share * shares
-            in_position = False
+    for i in range(1, len(data)):
+        # 更新最高未實現獲利價格
+        if data['Buy_Signal'][i - 1] and not data['Sell_Signal'][i - 1]:
+            highest_price = max(highest_price, data['Close'][i])
 
-    return cumulative_profit
+        # 購買條件
+        condition1 = data['Close'][i] > ema[i] * 1.03 and data['Close'][i - 1] < ema[i - 1]
+        condition2 = i >= 2 and data['Close'][i] > ema[i] * 1.01 and data['Close'][i - 1] > ema[i - 1] * 1.01
+        if condition1 or condition2:
+            data.at[i, 'Buy_Signal'] = True
+            highest_price = data['Close'][i]  # 重置最高價格為當前價格
 
+        # 賣出條件：包括原始條件及新增的短線最高未實現獲利回吐30%
+        condition3 = data['Close'][i] < ema[i] * 0.97 and data['Close'][i - 1] > ema[i - 1]
+        condition4 = i >= 2 and data['Close'][i] < ema[i] * 0.99 and data['Close'][i - 1] < ema[i - 1] * 0.99
+        condition5 = highest_price > 0 and data['Close'][i] < highest_price * 0.70  # 新增的停利賣出條件
+        if condition3 or condition4 or condition5:
+            data.at[i, 'Sell_Signal'] = True
+            highest_price = 0  # 重置最高未實現獲利價格
 
-def find_best_ema_span(df):
-    ema_spans = range(13, 68)
-    cumulative_profits = {}
-
-    for ema_span in ema_spans:
-        cumulative_profit = calculate_ema_profit(df.copy(), ema_span)
-        cumulative_profits[ema_span] = cumulative_profit
-
-    best_ema_span = max(cumulative_profits, key=cumulative_profits.get)
-    return best_ema_span, cumulative_profits[best_ema_span]
+    return data
 
 
-def generate_trade_signals(df, ema_span):
-    df['EMA'] = df['Close'].ewm(span=ema_span, adjust=False).mean()
-    df['Pct_from_EMA'] = (df['Close'] - df['EMA']) / df['EMA'] * 100
-    df['Buy'] = ((df['Pct_from_EMA'] > 3) | ((df['Pct_from_EMA'] > 1) & (df['Pct_from_EMA'].shift(1) > 1)))
-    df['Sell'] = ((df['Pct_from_EMA'] < -3) | ((df['Pct_from_EMA'] < -1) & (df['Pct_from_EMA'].shift(1) < -1)))
+def find_trades(data):
+    """根據買入和賣出信號，找出交易點並計算每筆交易的利潤。"""
     trades = []
-    in_position = False
-    for index, row in df.iterrows():
-        if row['Buy'] and not in_position:
-            in_position = True
-            trades.append({'Date': index, 'Action': 'Buy', 'Price': row['Close']})
-        elif row['Sell'] and in_position:
-            in_position = False
-            sell_price = row['Close']
-            buy_price = trades[-1]['Price']
-            profit = sell_price - buy_price
-            trades.append({'Date': index, 'Action': 'Sell', 'Price': sell_price, 'Profit': profit})
+    current_buy_index = None
+    for index, row in data.iterrows():
+        if row['Buy_Signal'] and current_buy_index is None:
+            current_buy_index = index
+        elif row['Sell_Signal'] and current_buy_index is not None:
+            trades.append((current_buy_index, index))
+            current_buy_index = None
+    # 計算每筆交易的利潤
+    trade_results = []
+    for buy_index, sell_index in trades:
+        buy_price = data.loc[buy_index, 'Close']
+        sell_price = data.loc[sell_index, 'Close']
+        profit = (sell_price - buy_price) * 1000  # 假設每次交易 1000 股
+        trade_results.append({'Buy_Date': data.loc[buy_index, 'Date'],
+                              'Sell_Date': data.loc[sell_index, 'Date'],
+                              'Profit': profit})
+    return pd.DataFrame(trade_results)
 
-    return trades
+
+def test_ema_settings(data, ema_range):
+    """測試一系列不同的EMA設定，找出負利潤最少的最佳設定。"""
+    best_setting = None
+    min_negative_trades = float('inf')  # 初始化為無窮大
+    optimal_profit = 0
+
+    for ema_period in ema_range:
+        # 應用短波段策略
+        data_with_signals = apply_strategy(data.copy(), ema_period)
+        # 找出交易並計算利潤
+        trades_df = find_trades(data_with_signals)
+
+        # 計算負利潤的交易數量
+        try:
+            negative_trades = trades_df[trades_df['Profit'] < 0].shape[0]
+            # 更新最優設定，以負利潤最少為主要目標，若相同則以總利潤最高為次要考量
+            if negative_trades < min_negative_trades or \
+                    (negative_trades == min_negative_trades and trades_df['Profit'].sum() > optimal_profit):
+                best_setting = ema_period
+                min_negative_trades = negative_trades
+                optimal_profit = trades_df['Profit'].sum()
+
+            return best_setting, min_negative_trades, optimal_profit
+        except KeyError as e:
+            print(f"KeyError: {e}. Check if 'Profit' column exists in the DataFrame.")
 
 
-def trade_signals(dataPath, log_file_path, csv_file_path):
-    # 初始化日誌文件
-    with open(log_file_path, 'w') as log_file:
-        log_file.write('')
+def trade_signals(dataPath, csv_file_path):
+    # 取得股票資料目錄下的所有檔案列表
+    stockDataList = os.listdir(dataPath)
 
-    # 初始化 CSV 文件並寫入表頭
-    with open(csv_file_path, 'w', newline='') as csv_file:
-        csv_writer = csv.writer(csv_file)
-        csv_writer.writerow(['Stock', 'Best_EMA_Span', 'Interval_Profit', 'Cumulative_Profit'])
+    # 迭代處理每一個股票檔案
+    for stock in stockDataList:
+        file_path = os.path.join(dataPath, stock)
+        data = load_data(file_path)  # 載入股票數據
 
-    # 遍歷股票文件並處理
-    stockFileList = os.listdir(dataPath)
-    results = []
-    for stock_file in stockFileList:
-        file_path = os.path.join(dataPath, stock_file)
-        df_stock = pd.read_csv(file_path)
-        df_stock['Date'] = pd.to_datetime(df_stock['Date'])
-        df_stock.set_index('Date', inplace=True)
+        ema_range = range(5, 70)  # 測試EMA的範圍
 
-        best_ema_span, _ = find_best_ema_span(df_stock)
-        tradeSignals = generate_trade_signals(df_stock, best_ema_span)
+        # 測試EMA設置
+        optimal_ema, negative_trades, total_profit = test_ema_settings(data, ema_range)
 
-        last_trades = tradeSignals[-10:] if len(tradeSignals) > 10 else tradeSignals
-        interval_profit = sum(trade.get('Profit', 0) for trade in last_trades if 'Profit' in trade)
-        cumulative_profit = sum(trade.get('Profit', 0) for trade in tradeSignals if 'Profit' in trade)
-        stock_name = stock_file.replace('.csv', '')
+        # 處理結果並寫入CSV文件
+        if os.path.exists(csv_file_path):
+            results_df = pd.read_csv(csv_file_path)
+        else:
+            results_df = pd.DataFrame(columns=['Stock', 'Optimal_EMA', 'Total_Profit'])
 
-        stock_info = {
-            'Stock': stock_name,
-            'Best_EMA_Span': best_ema_span,
-            'Interval_Profit': interval_profit,
-            'Cumulative_Profit': cumulative_profit
-        }
+        new_row = pd.DataFrame([[stock, optimal_ema, total_profit]], columns=['Stock', 'Optimal_EMA', 'Total_Profit'])
+        results_df = pd.concat([results_df, new_row], ignore_index=True)
 
-        results.append(stock_info)
-
-        # 寫入 CSV 文件
-        with open(csv_file_path, 'a', newline='') as csv_file:
-            csv_writer = csv.writer(csv_file)
-            csv_writer.writerow([stock_info['Stock'], stock_info['Best_EMA_Span'], stock_info['Interval_Profit'],
-                                 stock_info['Cumulative_Profit']])
-
-        # 寫入日誌文件和打印信息
-        with open(log_file_path, 'a') as log_file:
-            log_file.write(f"股票名稱: {stock_info['Stock']}\n")
-            log_file.write(f"最佳EMA跨度: {stock_info['Best_EMA_Span']}\n")
-            log_file.write(f"間隔利潤: {stock_info['Interval_Profit']}\n")
-            log_file.write(f"累計利潤: {stock_info['Cumulative_Profit']}\n")
-
-            print(f"股票名稱: {stock_info['Stock']}")
-            print(f"最佳EMA跨度: {stock_info['Best_EMA_Span']}")
-            print(f"間隔利潤: {stock_info['Interval_Profit']}")
-            print(f"累計利潤: {stock_info['Cumulative_Profit']}")
-
-            total_profit = 0
-            for signal in tradeSignals[-10:]:
-                signal_date = signal['Date'].strftime('%Y-%m-%d')
-                log_file.write(f"日期: {signal_date}, 行動: {signal['Action']}, 價格: {signal['Price']}")
-                if 'Profit' in signal:
-                    log_file.write(f", 利潤: {signal['Profit']}\n")
-                    total_profit += signal['Profit']
-                else:
-                    log_file.write('\n')
-            log_file.write(f"區間利潤: {total_profit}\n\n")
-
-    return results
+        results_df.sort_values(by='Total_Profit', ascending=False, inplace=True)
+        results_df.to_csv(csv_file_path, index=False)
+        # 輸出結果
+        print(f"{stock}: 最佳 EMA = {optimal_ema}, 負利潤交易數 = {negative_trades}, "
+              f"總利潤 = {total_profit}")
 
 
 def EMA_Strategy(dataPath):
-    # 處理所有股票檔案並收集信息
-    log_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\trade_signals_log.txt"
-    csv_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\stock_ema_results.csv"  # 新增的 CSV 檔案路徑
-    results = trade_signals(dataPath, log_file_path, csv_file_path)  # 將 CSV 檔案路徑傳遞給 trade_signals()
-
-    # 轉換為 DataFrame 並按區間利潤排序
-    df_results = pd.DataFrame(results)
-    df_sorted = df_results.sort_values(by='Interval_Profit', ascending=False)
-
-    # 儲存到 CSV 檔案
-    df_sorted.to_csv(csv_file_path, index=False)
-
-    print(csv_file_path, df_sorted.head())  # 返回 CSV 檔案路徑和前幾行數據進行檢查
+    csv_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\optimal_ema_results.csv"
+    """處理所有股票文件並收集相關信息。"""
+    trade_signals(dataPath, csv_file_path)  # 將 CSV 檔案路徑傳遞給 trade_signals()
