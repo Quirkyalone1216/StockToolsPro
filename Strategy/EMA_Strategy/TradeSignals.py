@@ -344,10 +344,22 @@ def plot_candlestick_chart(csv_file_path, ema_value=None):
     signals_buy['Signal'] = np.nan
     signals_sell['Signal'] = np.nan
 
+    # 自動檢測 EMA 列
+    if ema_value is None:
+        ema_columns = [col for col in df.columns if
+                       'EMA' in col and 'Trade Signal' not in col and 'Trade Profit' not in col]
+        if ema_columns:
+            ema_value = ema_columns[0]  # 使用第一個檢測到的 EMA 列
+        else:
+            raise ValueError("No EMA column found in the CSV file.")
+
     # 對於有買入 'Buy' 信號的行，將買入信號 DataFrame 對應的行更新為 df 中的收盤價（Close）
+    signals_buy.loc[df[f'{ema_value} Trade Signal'] == 'Buy', 'Signal'] = \
+        df.loc[df[f'{ema_value} Trade Signal'] == 'Buy', 'Close']
+
     # 對於有賣出 'Sell' 信號的行，將賣出信號 DataFrame 對應的行更新為 df 中的收盤價（Close）
-    signals_buy.loc[df['EMA16 Trade Signal'] == 'Buy', 'Signal'] = df.loc[df['EMA16 Trade Signal'] == 'Buy', 'Close']
-    signals_sell.loc[df['EMA16 Trade Signal'] == 'Sell', 'Signal'] = df.loc[df['EMA16 Trade Signal'] == 'Sell', 'Close']
+    signals_sell.loc[df[f'{ema_value} Trade Signal'] == 'Sell', 'Signal'] = \
+        df.loc[df[f'{ema_value} Trade Signal'] == 'Sell', 'Close']
 
     # 創建買入和賣出信號的圖層，分別使用不同的標記
     buy_markers = mpf.make_addplot(signals_buy['Signal'], type='scatter', markersize=100, marker='^', color='red',
@@ -355,8 +367,16 @@ def plot_candlestick_chart(csv_file_path, ema_value=None):
     sell_markers = mpf.make_addplot(signals_sell['Signal'], type='scatter', markersize=100, marker='v', color='green',
                                     alpha=0.5)
 
+    # 繪製 EMA 線
+    ema_line = mpf.make_addplot(df[ema_value], color='blue', width=2)
+
+    # K線圖表title
+    stock_symbol = os.path.basename(csv_file_path).split('.')[0]
+    title = f'{stock_symbol} with {ema_value}'
+
     # 繪製圖表，包括買入和賣出信號
-    mpf.plot(df, type='candle', addplot=[buy_markers, sell_markers], volume=True, style='charles')
+    mpf.plot(df, type='candle', addplot=[buy_markers, sell_markers, ema_line], volume=True, style='charles',
+             title=title, datetime_format='%Y-%m-%d')
 
 
 def BackTest(dataPath):
@@ -367,14 +387,14 @@ def BackTest(dataPath):
         os.makedirs(output_signalDir, exist_ok=False)
 
     volume = 1000  # 假設的交易量
-    start_date = "2022-01-07"
-    end_date = "2022-10-28"
+    start_date = "2023-01-01"
+    end_date = "2024-01-01"
     months = 3
 
     if not os.path.exists(output_csv_path):
         Backtest2Csv(volume, start_date, end_date, output_csv_path, dataPath)
     else:
-        # BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_signalDir)
+        BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_signalDir)
         plotStockList = os.listdir(output_signalDir)
         for plotStock in plotStockList:
             print(plotStock)
