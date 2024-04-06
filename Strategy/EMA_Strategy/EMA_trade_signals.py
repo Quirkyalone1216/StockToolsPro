@@ -1,6 +1,8 @@
 import pandas as pd
 import os
 
+from EMA_Strategy.TradeSignals import BackTest
+
 
 def load_data(file_path):
     """從 CSV 檔案中讀取股票數據並轉換成 Pandas DataFrame 格式。"""
@@ -93,6 +95,43 @@ def test_ema_settings(data, ema_range):
             print(f"KeyError: {e}. Check if 'Profit' column exists in the DataFrame.")
 
 
+def analyze_stock_data(file_path, start_date, end_date, ema_period):
+    # 步驟1：載入股票數據
+    data = load_data(file_path)
+
+    # 篩選指定時間範圍的數據並重新設置索引
+    filtered_data = data[(data['Date'] >= start_date) & (data['Date'] <= end_date)].reset_index(drop=True)
+
+    # 步驟2：應用交易策略
+    processed_data = apply_strategy(filtered_data, ema_period)
+
+    # 步驟3：在指定時間範圍內尋找交易
+    trade_results = find_trades(processed_data)
+
+    try:
+        # 計算統計數據
+        positive_trades = trade_results[trade_results['Profit'] > 0].shape[0]
+        negative_trades = trade_results[trade_results['Profit'] < 0].shape[0]
+        total_interval_profit = trade_results['Profit'].sum()
+
+        # 生成交易信號摘要
+        buy_signals_count = processed_data['Buy_Signal'].sum()
+        sell_signals_count = processed_data['Sell_Signal'].sum()
+
+        # 編譯統計數據
+        statistics = {
+            'Positive_Trades': positive_trades,
+            'Negative_Trades': negative_trades,
+            'Total_Interval_Profit': total_interval_profit,
+            'Buy_Signals': buy_signals_count,
+            'Sell_Signals': sell_signals_count
+        }
+
+        return statistics
+    except KeyError as e:
+        print(f"KeyError: {e}. Check if 'Profit' column exists in the DataFrame.")
+
+
 def trade_signals(dataPath, csv_file_path):
     # 取得股票資料目錄下的所有檔案列表
     stockDataList = os.listdir(dataPath)
@@ -122,8 +161,14 @@ def trade_signals(dataPath, csv_file_path):
         print(f"{stock}: 最佳 EMA = {optimal_ema}, 負利潤交易數 = {negative_trades}, "
               f"總利潤 = {total_profit}")
 
+        # 指定時間範圍回測
+        start_date = '2022-01-01'
+        end_date = '2023-01-01'
+        analyze_stock_data(file_path, start_date, end_date, optimal_ema)
+
 
 def EMA_Strategy(dataPath):
     csv_file_path = r"D:\Temp\StockData\TW_STOCK_DATA\optimal_ema_results.csv"
     """處理所有股票文件並收集相關信息。"""
-    trade_signals(dataPath, csv_file_path)  # 將 CSV 檔案路徑傳遞給 trade_signals()
+    # trade_signals(dataPath, csv_file_path)  # 將 CSV 檔案路徑傳遞給 trade_signals()
+    BackTest(dataPath)
