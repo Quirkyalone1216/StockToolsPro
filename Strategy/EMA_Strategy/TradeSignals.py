@@ -18,7 +18,7 @@ def calculate_ema(prices, days):
     return prices.ewm(span=days, adjust=False).mean()
 
 
-def simulate_trades_with_volume(data, volume, ema_days):
+def EMA_TradeSignals(data, volume, ema_days):
     """
     根據EMA和交易量模擬交易策略，返回交易和總利潤。
     """
@@ -74,6 +74,38 @@ def simulate_trades_with_volume(data, volume, ema_days):
     return trades, total_profit
 
 
+def EMA_Cross_TradeSignals(data, volume, ema_short=17, ema_long=67):
+    """
+    根據EMA黃金交叉和死亡交叉模擬交易策略，返回交易和總利潤。
+    """
+    # 計算EMA23和EMA67
+    data['EMA23'] = calculate_ema(data['Close'], ema_short)
+    data['EMA67'] = calculate_ema(data['Close'], ema_long)
+
+    trades = []
+    total_profit = 0
+    position_open = False
+
+    for i in range(1, len(data)):
+        # 黃金交叉買入條件
+        if not position_open and data['EMA23'].iloc[i] > data['EMA67'].iloc[i] and data['EMA23'].iloc[i - 1] <= \
+                data['EMA67'].iloc[i - 1]:
+            position_open = True
+            buy_price = data['Close'].iloc[i]
+            trades.append(('Buy', data['Date'].iloc[i], buy_price, 0, total_profit))
+
+        # 死亡交叉賣出條件
+        elif position_open and data['EMA23'].iloc[i] < data['EMA67'].iloc[i] and data['EMA23'].iloc[i - 1] >= \
+                data['EMA67'].iloc[i - 1]:
+            sell_price = data['Close'].iloc[i]
+            profit = (sell_price - buy_price) * volume
+            total_profit += profit
+            trades.append(('Sell', data['Date'].iloc[i], sell_price, profit, total_profit))
+            position_open = False
+
+    return trades, total_profit
+
+
 def summarize_trades(trades, start_date, end_date):
     """
     篩選指定起始日期和結束日期內的交易，總結利潤並計算正利潤和負利潤的次數。
@@ -111,7 +143,7 @@ def optimize_ema(data, start_date, end_date, volume, ema_range):
     }
 
     for ema_days in range(ema_range[0], ema_range[1] + 1):
-        trades, _ = simulate_trades_with_volume(filtered_data, volume, ema_days)
+        trades, _ = EMA_TradeSignals(filtered_data, volume, ema_days)
         positive_profit_count = sum(1 for trade in trades if trade[3] > 0)
         negative_profit_count = sum(1 for trade in trades if trade[3] < 0)
         interval_profit = sum(trade[3] for trade in trades)
@@ -149,7 +181,7 @@ def read_stock_data(file_path):
     return data
 
 
-def write_to_csv(file_path, mode, data_rows):
+def EMA_write_to_csv(file_path, mode, data_rows):
     """
     處理寫入 CSV 檔案的函數。
     :param file_path: CSV 檔案的路徑。
@@ -165,9 +197,9 @@ def write_to_csv(file_path, mode, data_rows):
         writer.writerows(data_rows)
 
 
-def Backtest2Csv(volume, start_date, end_date, output_csv_path, dataPath):
+def Backtest_EMA2Csv(volume, start_date, end_date, output_csv_path, dataPath):
     # Initialize CSV with headers
-    write_to_csv(output_csv_path, 'w', [])
+    EMA_write_to_csv(output_csv_path, 'w', [])
 
     stockFileList = os.listdir(dataPath)
     all_optimization_results = []
@@ -179,13 +211,13 @@ def Backtest2Csv(volume, start_date, end_date, output_csv_path, dataPath):
         ema_days = 23  # 假設的EMA天數
 
         # 執行模擬交易
-        trades, total_profit = simulate_trades_with_volume(sample_data, volume, ema_days)
+        trades, total_profit = EMA_TradeSignals(sample_data, volume, ema_days)
 
         # 篩選和總結交易
         summarize_trades(trades, start_date, end_date)
 
         # 優化EMA
-        ema_range = (5, 70)  # 測試EMA設置的範圍
+        ema_range = (22, 23)  # 測試EMA設置的範圍
         optimal_ema_settings = optimize_ema(sample_data, start_date, end_date, volume, ema_range)
 
         # 第一部分：檢查 'EMA' 是否不為 None
@@ -208,14 +240,104 @@ def Backtest2Csv(volume, start_date, end_date, output_csv_path, dataPath):
 
     # 將所有優化結果以附加模式寫入 CSV 檔案
     for result_batch in all_optimization_results:
-        write_to_csv(output_csv_path, 'a', [result_batch])
+        EMA_write_to_csv(output_csv_path, 'a', [result_batch])
 
     # 重新開啟 CSV 檔案以覆寫排序後的結果
     sorted_results = sorted(all_optimization_results, key=lambda x: (-x[4], -x[2]))
-    write_to_csv(output_csv_path, 'w', sorted_results)
+    EMA_write_to_csv(output_csv_path, 'w', sorted_results)
 
 
-def filter_recent_trades(volume, months, output_csv_path, dataPath):
+def export_trades_to_csv(data, trades, output_csv_path):
+    """
+    將帶有交易信號和每筆交易利潤的數據導出到指定的CSV文件。
+
+    參數:
+    - data: 包含股票數據的原始DataFrame。
+    - trades: 一個包含交易元組 (交易動作, 交易日期, 交易價格, 每筆交易利潤, 總利潤) 的列表。
+    - output_csv_path: 輸出CSV文件的路徑。
+    """
+    # 將原始數據添加交易信號和每筆交易利潤的新列
+    data['Trade Signal'] = None
+    data['Profit per Trade'] = 0.0
+
+    # 使用交易信息更新DataFrame
+    for trade in trades:
+        trade_action, trade_date, _, trade_profit, _ = trade
+        data.loc[data['Date'] == trade_date, 'Trade Signal'] = trade_action
+        data.loc[data['Date'] == trade_date, 'Profit per Trade'] = trade_profit
+
+    # 將更新後的DataFrame保存到指定的CSV文件
+    data.to_csv(output_csv_path, index=False)
+
+
+def chkRecentTrade(folder_path, days):
+    """
+    在指定天數內查找具有“買入”信號的股票。
+
+    參數:
+    - folder_path: 包含 CSV 文件的文件夾路徑。
+    - days_back: 回溯的天數。
+
+    返回:
+    - 一個股票代碼列表，其中包含在指定時間範圍內出現“買入”信號的股票。
+    """
+    # 計算要考慮的信號的開始日期
+    start_date = datetime.now() - timedelta(days=days)
+
+    # 初始化一個列表來保存具有“買入”信號的股票代碼
+    stocks_with_buy_signals = []
+
+    # 列出提供的文件夾路徑中的所有文件
+    for file_name in os.listdir(folder_path):
+        file_path = os.path.join(folder_path, file_name)
+        try:
+            df = pd.read_csv(file_path)
+            df['Date'] = pd.to_datetime(df['Date'])
+            # 過濾指定時間範圍內的“買入”信號
+            recent_buy_signals = df[(df['Date'] > start_date) & (df['Trade Signal'] == 'Buy')]
+            if not recent_buy_signals.empty:
+                """
+                stock_code = file_name.split('.')[0]
+                stocks_with_buy_signals.append(stock_code)
+                """
+                stocks_with_buy_signals.append(file_name)
+        except Exception as e:
+            print(f"處理 {file_name} 時出錯: {e}")
+
+    return stocks_with_buy_signals
+
+
+def Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath, days):
+    stockFileList = os.listdir(dataPath)
+
+    stocks_over_20b = filter_stocks_by_cap(stockFileList, dataPath)
+    print("股本超過20億的股票代號:", stocks_over_20b)
+
+    for stock in stocks_over_20b:
+        print(stock)
+        file_path = os.path.join(dataPath, stock)  # 替換成你的CSV檔案路徑
+        sample_data = read_stock_data(file_path)
+
+        # 執行模擬交易
+        trades, total_profit = EMA_Cross_TradeSignals(sample_data, volume)
+        print("trades : ", trades)
+        print("total_profit : ", total_profit)
+
+        # 篩選和總結交易
+        summarize_trades(trades, start_date, end_date)
+
+        output_csv_path = os.path.join(output_signalDir, stock)
+        export_trades_to_csv(sample_data, trades, output_csv_path)
+
+    short_ema = 21
+    long_ema = 50
+    recentFileList = chkRecentTrade(output_signalDir, days)
+    for recentFile in recentFileList:
+        recentPath = os.path.join(output_signalDir, recentFile)
+        plot_candlestick_chart(recentPath, short_ema, long_ema)
+
+
+def EMA_recent_trades(volume, months, output_csv_path, dataPath):
     optimal_ema_df = pd.read_csv(output_csv_path)
     recent_trades_stocks = []
     for filename in os.listdir(dataPath):
@@ -226,7 +348,7 @@ def filter_recent_trades(volume, months, output_csv_path, dataPath):
             data = pd.read_csv(data_path)
             data['Date'] = pd.to_datetime(data['Date'])
             # 正確解包trades和total_profit
-            trades, _ = simulate_trades_with_volume(data, volume, ema_days=optimal_ema)
+            trades, _ = EMA_TradeSignals(data, volume, ema_days=optimal_ema)
             recent_date = datetime.now() - timedelta(30 * months)
             # 確保trades是一個元組列表，其中第二個元素是可解析的日期
             recent_trades = [trade for trade in trades if pd.to_datetime(trade[1]) >= recent_date]
@@ -247,7 +369,10 @@ def filter_stocks_by_cap(stock_codes, data_path, cap_threshold=2e9):
     stocks_with_large_cap = []
 
     for stock_code in stock_codes:
-        file_name = f"{stock_code}.TW.csv"
+        if stock_code.endswith(".TW.csv"):
+            file_name = stock_code
+        else:
+            file_name = f"{stock_code}.TW.csv"
         file_path = os.path.join(data_path, file_name)
 
         if os.path.exists(file_path):
@@ -262,7 +387,7 @@ def filter_stocks_by_cap(stock_codes, data_path, cap_threshold=2e9):
     return stocks_with_large_cap
 
 
-def BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_signalDir):
+def BackTest_EMA2TradeSignals(volume, months, output_csv_path, dataPath, output_signalDir):
     """
     先看使用優化過的EMA數值產出的交易訊號，在三個月內有哪些股票有交易訊號，並進一步篩選流通股本>20億的股票，並輸出交易訊號CSV
     :param volume:
@@ -272,7 +397,7 @@ def BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_sign
     :param output_signalDir:
     :return:
     """
-    recent_stocks = filter_recent_trades(volume, months, output_csv_path, dataPath)
+    recent_stocks = EMA_recent_trades(volume, months, output_csv_path, dataPath)
     print("使用最佳EMA數值近期交易訊號 : ", recent_stocks)
     # 篩選股本超過20億的股票代號
     stocks_over_20b = filter_stocks_by_cap(recent_stocks, dataPath)
@@ -299,7 +424,7 @@ def BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_sign
         stock_data['Date'] = pd.to_datetime(stock_data['Date'])
 
         # 獲取EMA數值的交易訊號
-        trades, total_profit = simulate_trades_with_volume(stock_data, volume, optimal_ema)
+        trades, total_profit = EMA_TradeSignals(stock_data, volume, optimal_ema)
         print("trades : ", trades)
         print("total_profit : ", total_profit)
 
@@ -327,7 +452,7 @@ def BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_sign
         print(f"已將交易和股票數據保存到 {output_csv_path}")  # 印出保存檔案的訊息
 
 
-def plot_candlestick_chart(csv_file_path, ema_value=None):
+def plot_candlestick_chart(csv_file_path, short_ema, long_ema, ema_value=None):
     """
     繪製給定股票數據 CSV 檔案的蠟燭圖，並帶有基於指數移動平均線（EMA）的交易信號。
 
@@ -338,45 +463,59 @@ def plot_candlestick_chart(csv_file_path, ema_value=None):
     # 從 CSV 檔案加載股票數據
     df = pd.read_csv(csv_file_path, parse_dates=['Date'], index_col='Date')
 
+    # 計算EMA23和EMA67
+    df[f'EMA{short_ema}'] = calculate_ema(df['Close'], short_ema)
+    df[f'EMA{long_ema}'] = calculate_ema(df['Close'], long_ema)
+
     # 創建兩個新的 DataFrame，一個用於買入信號，一個用於賣出信號，初始化為 NaN
     signals_buy = pd.DataFrame(index=df.index)
     signals_sell = pd.DataFrame(index=df.index)
     signals_buy['Signal'] = np.nan
     signals_sell['Signal'] = np.nan
 
-    # 自動檢測 EMA 列
-    if ema_value is None:
-        ema_columns = [col for col in df.columns if
-                       'EMA' in col and 'Trade Signal' not in col and 'Trade Profit' not in col]
-        if ema_columns:
-            ema_value = ema_columns[0]  # 使用第一個檢測到的 EMA 列
-        else:
-            raise ValueError("No EMA column found in the CSV file.")
+    try:
+        # 自動檢測 EMA 列
+        if ema_value is None:
+            ema_columns = [col for col in df.columns if
+                           'EMA' in col and 'Trade Signal' not in col and 'Trade Profit' not in col]
+            if ema_columns:
+                ema_value = ema_columns[0]  # 使用第一個檢測到的 EMA 列
 
-    # 對於有買入 'Buy' 信號的行，將買入信號 DataFrame 對應的行更新為 df 中的收盤價（Close）
-    signals_buy.loc[df[f'{ema_value} Trade Signal'] == 'Buy', 'Signal'] = \
-        df.loc[df[f'{ema_value} Trade Signal'] == 'Buy', 'Close']
+                # 對於有買入 'Buy' 信號的行，將買入信號 DataFrame 對應的行更新為 df 中的收盤價（Close）
+                signals_buy.loc[df[f'{ema_value} Trade Signal'] == 'Buy', 'Signal'] = \
+                    df.loc[df[f'{ema_value} Trade Signal'] == 'Buy', 'Close']
 
-    # 對於有賣出 'Sell' 信號的行，將賣出信號 DataFrame 對應的行更新為 df 中的收盤價（Close）
-    signals_sell.loc[df[f'{ema_value} Trade Signal'] == 'Sell', 'Signal'] = \
-        df.loc[df[f'{ema_value} Trade Signal'] == 'Sell', 'Close']
+                # 對於有賣出 'Sell' 信號的行，將賣出信號 DataFrame 對應的行更新為 df 中的收盤價（Close）
+                signals_sell.loc[df[f'{ema_value} Trade Signal'] == 'Sell', 'Signal'] = \
+                    df.loc[df[f'{ema_value} Trade Signal'] == 'Sell', 'Close']
 
-    # 創建買入和賣出信號的圖層，分別使用不同的標記
+    except Exception as e:
+        print("Exception : ", e)
+
+    if 'Trade Signal' in df.columns:
+        # 對於具有 'Buy' 交易訊號的行，使用收盤價更新買入訊號 DataFrame
+        signals_buy.loc[df['Trade Signal'] == 'Buy', 'Signal'] = df.loc[df['Trade Signal'] == 'Buy', 'Close']
+        # 對於具有 'Sell' 交易訊號的行，使用收盤價更新賣出訊號 DataFrame
+        signals_sell.loc[df['Trade Signal'] == 'Sell', 'Signal'] = df.loc[df['Trade Signal'] == 'Sell', 'Close']
+
+    # 創建買入和賣出訊號的標記樣式
     buy_markers = mpf.make_addplot(signals_buy['Signal'], type='scatter', markersize=100, marker='^', color='red',
                                    alpha=0.5)
     sell_markers = mpf.make_addplot(signals_sell['Signal'], type='scatter', markersize=100, marker='v', color='green',
                                     alpha=0.5)
 
-    # 繪製 EMA 線
-    ema_line = mpf.make_addplot(df[ema_value], color='blue', width=2)
+    additional_plots = [buy_markers, sell_markers]
 
-    # K線圖表title
-    stock_symbol = os.path.basename(csv_file_path).split('.')[0]
-    title = f'{stock_symbol} with {ema_value}'
+    # 如果存在 EMA 欄位，將其添加到圖中
+    if ema_value:
+        short_ema_line = mpf.make_addplot(df[f'EMA{short_ema}'], color='green', width=2)
+        long_ema_line = mpf.make_addplot(df[f'EMA{long_ema}'], color='red', width=2)
+        additional_plots.append(short_ema_line)
+        additional_plots.append(long_ema_line)
 
-    # 繪製圖表，包括買入和賣出信號
-    mpf.plot(df, type='candle', addplot=[buy_markers, sell_markers, ema_line], volume=True, style='charles',
-             title=title, datetime_format='%Y-%m-%d')
+    # 繪製帶有買入和賣出訊號的蠟燭圖
+    mpf.plot(df, type='candle', addplot=additional_plots, volume=True, style='charles',
+             title=os.path.basename(csv_file_path), datetime_format='%Y-%m-%d')
 
 
 def BackTest(dataPath):
@@ -390,13 +529,19 @@ def BackTest(dataPath):
     start_date = "2023-01-01"
     end_date = "2024-01-01"
     months = 3
+    days = 30 * months
 
+    Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath, days)
+
+    """
     if not os.path.exists(output_csv_path):
-        Backtest2Csv(volume, start_date, end_date, output_csv_path, dataPath)
-    else:
-        BackTest2TradeSignals(volume, months, output_csv_path, dataPath, output_signalDir)
+        Backtest_EMA2Csv(volume, start_date, end_date, output_csv_path, dataPath)
+
+    if os.path.exists(output_csv_path):
+        BackTest_EMA2TradeSignals(volume, months, output_csv_path, dataPath, output_signalDir)
         plotStockList = os.listdir(output_signalDir)
         for plotStock in plotStockList:
             print(plotStock)
             plotStockPath = os.path.join(output_signalDir, plotStock)
             plot_candlestick_chart(plotStockPath)
+    """
