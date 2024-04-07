@@ -74,34 +74,51 @@ def EMA_TradeSignals(data, volume, ema_days):
     return trades, total_profit
 
 
-def EMA_Cross_TradeSignals(data, volume, ema_short=17, ema_long=67):
+def calculate_atr(data, period=14):
+    """
+    計算平均真實範圍（ATR）
+    """
+    high_low = data['High'] - data['Low']
+    high_close_prev = abs(data['High'] - data['Close'].shift(1))
+    low_close_prev = abs(data['Low'] - data['Close'].shift(1))
+    tr = pd.DataFrame([high_low, high_close_prev, low_close_prev]).max()
+    atr = tr.rolling(window=period).mean()
+    return atr
+
+
+def EMA_Cross_TradeSignals(data, volume, ema_short, ema_long, atr_period=14, atr_multiplier=2):
     """
     根據EMA黃金交叉和死亡交叉模擬交易策略，返回交易和總利潤。
+    利用ATR動態調整賣出閾值，同時考慮最低利潤和停損點。
     """
-    # 計算EMA23和EMA67
-    data['EMA23'] = calculate_ema(data['Close'], ema_short)
-    data['EMA67'] = calculate_ema(data['Close'], ema_long)
+    # 計算EMA
+    data[f'EMA{ema_short}'] = calculate_ema(data['Close'], ema_short)
+    data[f'EMA{ema_long}'] = calculate_ema(data['Close'], ema_long)
+    # 計算ATR
+    data['ATR'] = calculate_atr(data, atr_period)
 
     trades = []
     total_profit = 0
     position_open = False
+    buy_price = 0
 
     for i in range(1, len(data)):
-        # 黃金交叉買入條件
-        if not position_open and data['EMA23'].iloc[i] > data['EMA67'].iloc[i] and data['EMA23'].iloc[i - 1] <= \
-                data['EMA67'].iloc[i - 1]:
-            position_open = True
-            buy_price = data['Close'].iloc[i]
-            trades.append(('Buy', data['Date'].iloc[i], buy_price, 0, total_profit))
-
-        # 死亡交叉賣出條件
-        elif position_open and data['EMA23'].iloc[i] < data['EMA67'].iloc[i] and data['EMA23'].iloc[i - 1] >= \
-                data['EMA67'].iloc[i - 1]:
+        if not position_open:
+            # 黃金交叉買入條件
+            if data[f'EMA{ema_short}'].iloc[i] > data[f'EMA{ema_long}'].iloc[i] and data[f'EMA{ema_short}'].iloc[i - 1] <= data[f'EMA{ema_long}'].iloc[i - 1]:
+                position_open = True
+                buy_price = data['Close'].iloc[i]
+                trades.append(('Buy', data['Date'].iloc[i], buy_price, 0, total_profit))
+        else:
             sell_price = data['Close'].iloc[i]
             profit = (sell_price - buy_price) * volume
-            total_profit += profit
-            trades.append(('Sell', data['Date'].iloc[i], sell_price, profit, total_profit))
-            position_open = False
+            sell_threshold_atr = buy_price + atr_multiplier * data['ATR'].iloc[i]
+
+            # 檢查是否達到最低利潤或觸發停損，或者達到ATR動態賣出條件
+            if profit > buy_price * 0.2 * volume or profit < -buy_price * 0.05 * volume or sell_price >= sell_threshold_atr:
+                total_profit += profit
+                trades.append(('Sell', data['Date'].iloc[i], sell_price, profit, total_profit))
+                position_open = False
 
     return trades, total_profit
 
@@ -121,11 +138,13 @@ def summarize_trades(trades, start_date, end_date):
     negative_profit_count = sum(1 for trade in filtered_trades if trade[3] < 0)
     interval_profit = sum(trade[3] for trade in filtered_trades)
 
+    """
     print(f"從 {start_date.strftime('%Y-%m-%d')} 到 {end_date.strftime('%Y-%m-%d')} 的交易：")
     print(f"正利潤交易次數： {positive_profit_count}")
     print(f"負利潤交易次數： {negative_profit_count}")
     print(f"區間利潤： {interval_profit}")
     print(f"總利潤（所有交易）： {trades[-1][-1] if trades else 0}")
+    """
 
 
 def optimize_ema(data, start_date, end_date, volume, ema_range):
@@ -309,19 +328,21 @@ def chkRecentTrade(folder_path, days):
 
 def Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath, days):
     stockFileList = os.listdir(dataPath)
+    short_ema = 5
+    long_ema = 23
 
     stocks_over_20b = filter_stocks_by_cap(stockFileList, dataPath)
     print("股本超過20億的股票代號:", stocks_over_20b)
 
     for stock in stocks_over_20b:
-        print(stock)
+        # print(stock)
         file_path = os.path.join(dataPath, stock)  # 替換成你的CSV檔案路徑
         sample_data = read_stock_data(file_path)
 
         # 執行模擬交易
-        trades, total_profit = EMA_Cross_TradeSignals(sample_data, volume)
-        print("trades : ", trades)
-        print("total_profit : ", total_profit)
+        trades, total_profit = EMA_Cross_TradeSignals(sample_data, volume, short_ema, long_ema)
+        # print("trades : ", trades)
+        # print("total_profit : ", total_profit)
 
         # 篩選和總結交易
         summarize_trades(trades, start_date, end_date)
@@ -329,8 +350,6 @@ def Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath,
         output_csv_path = os.path.join(output_signalDir, stock)
         export_trades_to_csv(sample_data, trades, output_csv_path)
 
-    short_ema = 21
-    long_ema = 50
     recentFileList = chkRecentTrade(output_signalDir, days)
     for recentFile in recentFileList:
         recentPath = os.path.join(output_signalDir, recentFile)
@@ -508,14 +527,14 @@ def plot_candlestick_chart(csv_file_path, short_ema, long_ema, ema_value=None):
 
     # 如果存在 EMA 欄位，將其添加到圖中
     if ema_value:
-        short_ema_line = mpf.make_addplot(df[f'EMA{short_ema}'], color='green', width=2)
-        long_ema_line = mpf.make_addplot(df[f'EMA{long_ema}'], color='red', width=2)
+        short_ema_line = mpf.make_addplot(df[f'EMA{short_ema}'], color='yellow', width=1)
+        long_ema_line = mpf.make_addplot(df[f'EMA{long_ema}'], color='blue', width=1)
         additional_plots.append(short_ema_line)
         additional_plots.append(long_ema_line)
 
     # 繪製帶有買入和賣出訊號的蠟燭圖
-    mpf.plot(df, type='candle', addplot=additional_plots, volume=True, style='charles',
-             title=os.path.basename(csv_file_path), datetime_format='%Y-%m-%d')
+    mpf.plot(df, type='candle', addplot=additional_plots, style='charles', title=os.path.basename(csv_file_path),
+             datetime_format='%Y-%m-%d')
 
 
 def BackTest(dataPath):
@@ -526,8 +545,8 @@ def BackTest(dataPath):
         os.makedirs(output_signalDir, exist_ok=False)
 
     volume = 1000  # 假設的交易量
-    start_date = "2023-01-01"
-    end_date = "2024-01-01"
+    start_date = "2024-01-01"
+    end_date = "2024-04-01"
     months = 3
     days = 30 * months
 
