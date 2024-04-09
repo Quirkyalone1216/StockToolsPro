@@ -7,6 +7,7 @@ import os
 import re
 import shutil
 import requests
+from CrawlData.OHLC_DATA.rolling_window import recentSignals
 
 
 def LineSetting():
@@ -55,21 +56,51 @@ def DiscordExecute(client, DISCORD_TOKEN):
     # 事件處理：監聽訊息
     @client.event
     async def on_message(message):
+        hint_message = "輸入help可以看到指令一覽表"
         # 如果訊息來自 bot 自身，不做任何事
         if message.author == client.user:
             return
 
-        if re.match(r"\d{4}\.TW", message.content):
+        if re.match(r"\d{4}", message.content):
             print(f"Received message from {message.author}: {message.content}")
             content = GetTW_RealTime_Data(message.content)
             try:
                 # 由於 Discord 訊息有字元限制，可能需要分段發送或截斷
                 await message.channel.send(content[:2000])  # 發送前 2000 個字符
+                await message.channel.send(hint_message)
+                return
             except Exception as e:
                 await message.channel.send(f'Error reading file: {e}')
+                return
+
+        elif message.content.lower() == "help":
+            help_message = helpMessage()
+            await message.channel.send(help_message)
+            return
+
+        elif message.content.lower() == "list all":
+            all_content = recentSignals()
+            if len(all_content) <= 2000:
+                await message.channel.send(all_content)
+            else:
+                chunks = [all_content[i:i + 2000] for i in range(0, len(all_content), 2000)]
+                for chunk in chunks:
+                    await message.channel.send(chunk)
+
+            await message.channel.send(hint_message)
+            return
 
     # 使用 Token 啟動 bot
     client.run(DISCORD_TOKEN)
+
+
+def helpMessage():
+    str1 = "以下是輸入命令格式\n"
+    str2 = "==========================================\n"
+    str3 = "查詢股票最近型態(30分K)  輸入 XXXX，其中XXXX為數字\n"
+    str4 = "查詢全部台灣股票最近交易訊號  輸入 list all \n"
+    sendMsg = str1 + str2 + str3 + str4
+    return sendMsg
 
 
 def removeDir(directory):
@@ -95,35 +126,44 @@ def ReadRealTimeData(filePath):
 
 
 def GetTW_RealTime_Data(message_content):
-    rmDirList = ['sort_test', 'test']
-    removeDir(rmDirList)
+    TW_StockList = '..\\..\\OHLC_DATA\\TW_STOCK_LIST.txt'
+    stock_list_df = pd.read_csv(TW_StockList, sep="\s+", usecols=["有價證券代號"], encoding="utf-8", dtype=str)
+    stock_codes = stock_list_df["有價證券代號"].tolist()
 
-    # 獲取今天的日期
-    today = datetime.date.today()
+    if any(stock_code == message_content for stock_code in stock_codes):
+        message_content += ".TW"
+        rmDirList = ['sort_test', 'test']
+        removeDir(rmDirList)
 
-    # 使用timedelta增加一天
-    time_end = (today + datetime.timedelta(days=1)).strftime("%Y%m%d")
-    time_start = (today - datetime.timedelta(days=6)).strftime("%Y%m%d")
+        # 獲取今天的日期
+        today = datetime.date.today()
 
-    SDate = time_start
-    EData = time_end
-    Prod = message_content
-    Kind = 'Stock'
-    Cycle = '30m'
+        # 使用timedelta增加一天
+        time_end = (today + datetime.timedelta(days=1)).strftime("%Y%m%d")
+        time_start = (today - datetime.timedelta(days=6)).strftime("%Y%m%d")
 
-    os.makedirs('test', exist_ok=True)
-    CalAllPattern(SDate, EData, Prod, Kind, Cycle, 'test')
+        SDate = time_start
+        EData = time_end
+        Prod = message_content
+        Kind = 'Stock'
+        Cycle = '30m'
 
-    result_path = 'test'
-    output_dir = 'sort_test'
-    outputFileName = 'Pattern_TW_Test.txt'
-    mode = 'Highlight'
-    region = 'TW'
-    SortOutput(result_path, output_dir, outputFileName, mode, region)
+        os.makedirs('test', exist_ok=True)
+        CalAllPattern(SDate, EData, Prod, Kind, Cycle, 'test')
 
-    filePath = "Pattern_TW_Test.txt"
-    content = ReadRealTimeData(filePath)
-    return content
+        result_path = 'test'
+        output_dir = 'sort_test'
+        outputFileName = 'Pattern_TW_Test.txt'
+        mode = 'Highlight'
+        region = 'TW'
+        SortOutput(result_path, output_dir, outputFileName, mode, region)
+
+        filePath = "Pattern_TW_Test.txt"
+        content = ReadRealTimeData(filePath)
+        return content
+
+    else:
+        return "輸入股票代號不存在"
 
 
 if __name__ == '__main__':

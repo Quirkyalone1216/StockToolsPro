@@ -74,51 +74,33 @@ def EMA_TradeSignals(data, volume, ema_days):
     return trades, total_profit
 
 
-def calculate_atr(data, period=14):
+def EMA_Gap_TradeSignals(data, ema_period=23):
     """
-    計算平均真實範圍（ATR）
+    根據收盤價與EMA的差距幅度來標記買賣訊號，並計算區間利潤與總利潤。
+    當收盤價高於上一次買入價格的10%時賣出。
     """
-    high_low = data['High'] - data['Low']
-    high_close_prev = abs(data['High'] - data['Close'].shift(1))
-    low_close_prev = abs(data['Low'] - data['Close'].shift(1))
-    tr = pd.DataFrame([high_low, high_close_prev, low_close_prev]).max()
-    atr = tr.rolling(window=period).mean()
-    return atr
-
-
-def EMA_Cross_TradeSignals(data, volume, ema_short, ema_long, atr_period=14, atr_multiplier=2):
-    """
-    根據EMA黃金交叉和死亡交叉模擬交易策略，返回交易和總利潤。
-    利用ATR動態調整賣出閾值，同時考慮最低利潤和停損點。
-    """
-    # 計算EMA
-    data[f'EMA{ema_short}'] = calculate_ema(data['Close'], ema_short)
-    data[f'EMA{ema_long}'] = calculate_ema(data['Close'], ema_long)
-    # 計算ATR
-    data['ATR'] = calculate_atr(data, atr_period)
+    # 計算EMA與差距幅度
+    data['EMA'] = calculate_ema(data['Close'], ema_period)
+    data['Gap'] = (data['Close'] - data['EMA']) / data['EMA'] * 100
 
     trades = []
     total_profit = 0
-    position_open = False
-    buy_price = 0
+    state = 'buy'
+    last_buy_price = 0
 
     for i in range(1, len(data)):
-        if not position_open:
-            # 黃金交叉買入條件
-            if data[f'EMA{ema_short}'].iloc[i] > data[f'EMA{ema_long}'].iloc[i] and data[f'EMA{ema_short}'].iloc[i - 1] <= data[f'EMA{ema_long}'].iloc[i - 1]:
-                position_open = True
-                buy_price = data['Close'].iloc[i]
-                trades.append(('Buy', data['Date'].iloc[i], buy_price, 0, total_profit))
-        else:
-            sell_price = data['Close'].iloc[i]
-            profit = (sell_price - buy_price) * volume
-            sell_threshold_atr = buy_price + atr_multiplier * data['ATR'].iloc[i]
-
-            # 檢查是否達到最低利潤或觸發停損，或者達到ATR動態賣出條件
-            if profit > buy_price * 0.2 * volume or profit < -buy_price * 0.05 * volume or sell_price >= sell_threshold_atr:
-                total_profit += profit
-                trades.append(('Sell', data['Date'].iloc[i], sell_price, profit, total_profit))
-                position_open = False
+        # 買入條件：差距幅度從增加轉變為減少
+        if state == 'buy' and data['Gap'][i] < data['Gap'][i - 1]:
+            last_buy_price = data['Close'][i]
+            trades.append(('Buy', data['Date'][i], last_buy_price, 0, total_profit))
+            state = 'sell'
+        # 賣出條件：差距幅度從增加轉變為減少，且收盤價高於上一次買入價格的10%
+        elif state == 'sell' and data['Gap'][i] < data['Gap'][i - 1] and data['Close'][i] > last_buy_price * 1.10:
+            sell_price = data['Close'][i]
+            profit = sell_price - last_buy_price
+            total_profit += profit
+            trades.append(('Sell', data['Date'][i], sell_price, profit, total_profit))
+            state = 'buy'
 
     return trades, total_profit
 
@@ -328,8 +310,7 @@ def chkRecentTrade(folder_path, days):
 
 def Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath, days):
     stockFileList = os.listdir(dataPath)
-    short_ema = 5
-    long_ema = 23
+    ema = 23
 
     stocks_over_20b = filter_stocks_by_cap(stockFileList, dataPath)
     print("股本超過20億的股票代號:", stocks_over_20b)
@@ -340,7 +321,7 @@ def Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath,
         sample_data = read_stock_data(file_path)
 
         # 執行模擬交易
-        trades, total_profit = EMA_Cross_TradeSignals(sample_data, volume, short_ema, long_ema)
+        trades, total_profit = EMA_Gap_TradeSignals(sample_data, volume)
         # print("trades : ", trades)
         # print("total_profit : ", total_profit)
 
@@ -353,7 +334,7 @@ def Backtest_EMA_Cross(volume, start_date, end_date, output_signalDir, dataPath,
     recentFileList = chkRecentTrade(output_signalDir, days)
     for recentFile in recentFileList:
         recentPath = os.path.join(output_signalDir, recentFile)
-        plot_candlestick_chart(recentPath, short_ema, long_ema)
+        plot_candlestick_chart(recentPath, ema)
 
 
 def EMA_recent_trades(volume, months, output_csv_path, dataPath):
@@ -471,7 +452,7 @@ def BackTest_EMA2TradeSignals(volume, months, output_csv_path, dataPath, output_
         print(f"已將交易和股票數據保存到 {output_csv_path}")  # 印出保存檔案的訊息
 
 
-def plot_candlestick_chart(csv_file_path, short_ema, long_ema, ema_value=None):
+def plot_candlestick_chart(csv_file_path, ema, ema_value=None):
     """
     繪製給定股票數據 CSV 檔案的蠟燭圖，並帶有基於指數移動平均線（EMA）的交易信號。
 
@@ -482,9 +463,8 @@ def plot_candlestick_chart(csv_file_path, short_ema, long_ema, ema_value=None):
     # 從 CSV 檔案加載股票數據
     df = pd.read_csv(csv_file_path, parse_dates=['Date'], index_col='Date')
 
-    # 計算EMA23和EMA67
-    df[f'EMA{short_ema}'] = calculate_ema(df['Close'], short_ema)
-    df[f'EMA{long_ema}'] = calculate_ema(df['Close'], long_ema)
+    # 計算EMA
+    df[f'EMA{ema}'] = calculate_ema(df['Close'], ema)
 
     # 創建兩個新的 DataFrame，一個用於買入信號，一個用於賣出信號，初始化為 NaN
     signals_buy = pd.DataFrame(index=df.index)
@@ -527,10 +507,8 @@ def plot_candlestick_chart(csv_file_path, short_ema, long_ema, ema_value=None):
 
     # 如果存在 EMA 欄位，將其添加到圖中
     if ema_value:
-        short_ema_line = mpf.make_addplot(df[f'EMA{short_ema}'], color='yellow', width=1)
-        long_ema_line = mpf.make_addplot(df[f'EMA{long_ema}'], color='blue', width=1)
-        additional_plots.append(short_ema_line)
-        additional_plots.append(long_ema_line)
+        ema_line = mpf.make_addplot(df[f'EMA{ema}'], color='blue', width=1)
+        additional_plots.append(ema_line)
 
     # 繪製帶有買入和賣出訊號的蠟燭圖
     mpf.plot(df, type='candle', addplot=additional_plots, style='charles', title=os.path.basename(csv_file_path),
