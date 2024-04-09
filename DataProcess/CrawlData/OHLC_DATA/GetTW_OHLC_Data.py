@@ -8,6 +8,7 @@ from pyrate_limiter import Duration, RequestRate, Limiter
 import requests
 import datetime
 import shutil
+from rolling_window import TW_StockSignal
 
 
 # 定義一個具有緩存和限速功能的Session類
@@ -125,7 +126,6 @@ def GetTWStock_OHLC_Data(time_start, time_end, time_start_15m):
             downloadTWStockData(stock_id, time_start, time_end, K_total_dir[0], K_Data_type[0])
             downloadTWStockData(stock_id, time_start, time_end, K_total_dir[1], K_Data_type[1])
             downloadTWStockData(stock_id, time_start_15m, time_end, K_total_dir[2], K_Data_type[2])
-
         except Exception as e:
             print(f"{stock_id}: 下載失敗，原因: {e}")
 
@@ -140,3 +140,4 @@ if __name__ == '__main__':
 
     # time_end = "2023-08-03"
     GetTWStock_OHLC_Data(time_start, time_end, time_start_15m)
+    TW_StockSignal()
