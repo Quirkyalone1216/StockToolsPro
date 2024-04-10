@@ -8,6 +8,8 @@ import re
 import shutil
 import requests
 from CrawlData.OHLC_DATA.rolling_window import recentSignals
+import schedule  # Added for scheduling
+import time  # Added for continuous loop
 
 
 def LineSetting():
@@ -78,17 +80,20 @@ def DiscordExecute(client, DISCORD_TOKEN):
             await message.channel.send(help_message)
             return
 
-        elif message.content.lower() == "list all":
-            all_content = recentSignals()
-            if len(all_content) <= 2000:
-                await message.channel.send(all_content)
-            else:
-                chunks = [all_content[i:i + 2000] for i in range(0, len(all_content), 2000)]
-                for chunk in chunks:
-                    await message.channel.send(chunk)
+        elif message.content.lower().startswith("list all"):
+            parts = message.content.split()
+            if len(parts) == 3 and parts[2].isdigit():
+                days = int(parts[2])
+                all_content = recentSignals(days)
+                if len(all_content) <= 2000:
+                    await message.channel.send(all_content)
+                else:
+                    chunks = [all_content[i:i + 2000] for i in range(0, len(all_content), 2000)]
+                    for chunk in chunks:
+                        await message.channel.send(chunk)
 
-            await message.channel.send(hint_message)
-            return
+                await message.channel.send(hint_message)
+                return
 
     # 使用 Token 啟動 bot
     client.run(DISCORD_TOKEN)
@@ -98,7 +103,7 @@ def helpMessage():
     str1 = "以下是輸入命令格式\n"
     str2 = "==========================================\n"
     str3 = "查詢股票最近型態(30分K)  輸入 XXXX，其中XXXX為數字\n"
-    str4 = "查詢全部台灣股票最近交易訊號  輸入 list all \n"
+    str4 = "查詢全部台灣股票最近交易訊號(1 hour K)  輸入 list all X，其中X為數字 \n"
     sendMsg = str1 + str2 + str3 + str4
     return sendMsg
 

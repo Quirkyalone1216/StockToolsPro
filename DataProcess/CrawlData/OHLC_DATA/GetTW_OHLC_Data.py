@@ -9,6 +9,9 @@ import requests
 import datetime
 import shutil
 from rolling_window import TW_StockSignal
+import warnings
+
+warnings.filterwarnings('ignore')
 
 
 # 定義一個具有緩存和限速功能的Session類
@@ -102,9 +105,11 @@ def downloadTWStockData(stock_id, time_start, time_end, dataPath, K_type):
         print(f"{stock_id}: csv檔案已存在")
 
 
-def GetTWStock_OHLC_Data(time_start, time_end, time_start_15m):
-    K_type = ['Daily_K', 'Weekly_K', '15Minutes_K']
-    K_Data_type = ['1d', '1wk', '15m']
+def GetTWStock_OHLC_Data(time_start, time_end, time_start_30m, time_start_1h):
+    # K_type = ['Daily_K', 'Weekly_K', '15Minutes_K', 'Hour_K']
+    K_type = ['Daily_K', '30Minutes_K', 'Hour_K']
+    # K_Data_type = ['1d', '1wk', '15m', '1h']
+    K_Data_type = ['1d', '30m', '1h']
     K_total_dir = SaveDataPath(K_type)
     for K_dir in K_total_dir:
         delStockData(K_dir)
@@ -124,8 +129,9 @@ def GetTWStock_OHLC_Data(time_start, time_end, time_start_15m):
         stock_id = row["有價證券代號"]
         try:
             downloadTWStockData(stock_id, time_start, time_end, K_total_dir[0], K_Data_type[0])
-            downloadTWStockData(stock_id, time_start, time_end, K_total_dir[1], K_Data_type[1])
-            downloadTWStockData(stock_id, time_start_15m, time_end, K_total_dir[2], K_Data_type[2])
+            # downloadTWStockData(stock_id, time_start, time_end, K_total_dir[1], K_Data_type[1])
+            downloadTWStockData(stock_id, time_start_30m, time_end, K_total_dir[1], K_Data_type[1])
+            downloadTWStockData(stock_id, time_start_1h, time_end, K_total_dir[2], K_Data_type[2])
         except Exception as e:
             print(f"{stock_id}: 下載失敗，原因: {e}")
 
@@ -134,10 +140,11 @@ if __name__ == '__main__':
     time_start = "1900-01-01"
     today = datetime.date.today()
 
-    time_start_15m = today - datetime.timedelta(days=10)
+    time_start_30m = today - datetime.timedelta(days=50)
+    time_start_1h = today - datetime.timedelta(days=500)
     tomorrow = today + datetime.timedelta(days=4)
     time_end = tomorrow.strftime("%Y-%m-%d")
 
     # time_end = "2023-08-03"
-    GetTWStock_OHLC_Data(time_start, time_end, time_start_15m)
+    GetTWStock_OHLC_Data(time_start, time_end, time_start_30m, time_start_1h)
     TW_StockSignal()

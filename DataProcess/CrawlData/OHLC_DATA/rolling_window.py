@@ -61,7 +61,7 @@ def rw_extremes(data: np.array, order: int):
 
 
 def TW_StockSignal():
-    stockDataPath = r"D:\Temp\StockData\TW_STOCK_DATA\stock_data\Daily_K"
+    stockDataPath = r"D:\Temp\StockData\TW_STOCK_DATA\stock_data\Hour_K"
 
     outSignalsPath = r"D:\Temp\StockData\TW_STOCK_DATA\tradeSignals"
     if not os.path.exists(outSignalsPath):
@@ -74,9 +74,10 @@ def TW_StockSignal():
         data['Date'] = data['Date'].astype('datetime64[s]')
         """
         data = pd.read_csv(os.path.join(stockDataPath, stock))
+        data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
 
-        # tops, bottoms = rw_extremes(data['Close'].to_numpy(), 5)
-        tops, bottoms = rw_extremes(data['Close'].to_numpy(), 9)
+        _, bottoms = rw_extremes(data['Close'].to_numpy(), 15)
+        tops, _ = rw_extremes(data['Close'].to_numpy(), 20)
 
         # 標註買賣訊號
         data['Buy_Signal'] = None
@@ -99,8 +100,8 @@ def TW_StockSignal():
         for bottom in bottoms:
             plt.plot(idx[bottom[1]], bottom[2], marker='o', color='red')
 
-        plt.title(f'{stock}.TW closing price extreme')
-        plt.legend(['Close', 'High', 'Low'])
+        plt.title(f'{stock} closing price extreme')
+        plt.legend(['Close'])
         plt.show()
         """
 
@@ -109,8 +110,8 @@ def TW_StockSignal():
 def check_signals(file_path, day):
     df = pd.read_csv(file_path)
     # 確保日期以降序排序以獲得最後指定天數
-    df['Date'] = pd.to_datetime(df['Date'])
-    df.sort_values('Date', ascending=False, inplace=True)
+    df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
+    df.sort_values('Datetime', ascending=False, inplace=True)
 
     # 提取最後指定天數
     last_days = df.head(day)
@@ -124,7 +125,7 @@ def check_signals(file_path, day):
 
 def extract_signal_details(file_path, day):
     df = pd.read_csv(file_path)
-    df['Date'] = pd.to_datetime(df['Date'])
+    df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
     df.sort_values('Date', ascending=False, inplace=True)
     last_days = df.head(day)
     buy_signals = last_days[last_days['Buy_Signal'].notna()][['Date', 'Close', 'Buy_Signal']]
@@ -145,7 +146,8 @@ def format_output(buy_list, sell_list, buy_details, sell_details, look_back):
     for stock, signals in buy_details.items():
         buy_signals_output += f"- 股票代碼 {stock}:\n"
         for _, row in signals.iterrows():
-            date = row['Date'].date()  # 直接使用Timestamp對象的date方法
+            # date = row['Date'].date()  # 直接使用Timestamp對象的date方法
+            date = row['Date']  # 直接使用Timestamp對象的date方法
             close_price = f"{row['Close']:.2f}"  # 格式化收盤價至小數點後兩位
             buy_signals_output += f"  日期: {date}, 收盤價: {close_price}, 訊號: {row['Buy_Signal']}\n"
 
@@ -154,7 +156,8 @@ def format_output(buy_list, sell_list, buy_details, sell_details, look_back):
     for stock, signals in sell_details.items():
         sell_signals_output += f"- 股票代碼 {stock}:\n"
         for _, row in signals.iterrows():
-            date = row['Date'].date()  # 直接使用Timestamp對象的date方法
+            # date = row['Date'].date()  # 直接使用Timestamp對象的date方法
+            date = row['Date']  # 直接使用Timestamp對象的date方法
             close_price = f"{row['Close']:.2f}"  # 格式化收盤價至小數點後兩位
             sell_signals_output += f"  日期: {date}, 收盤價: {close_price}, 訊號: {row['Sell_Signal']}\n"
 
@@ -162,11 +165,11 @@ def format_output(buy_list, sell_list, buy_details, sell_details, look_back):
     return buy_output + sell_output + buy_signals_output + sell_signals_output
 
 
-def recentSignals():
+def recentSignals(days):
     # 檢查最後指定天數的買入和賣出信號
     signalsPath = r"D:\Temp\StockData\TW_STOCK_DATA\tradeSignals"
     stockList = os.listdir(signalsPath)
-    look_back = 10
+    look_back = days
     buy_stock = []
     sell_stock = []
 
