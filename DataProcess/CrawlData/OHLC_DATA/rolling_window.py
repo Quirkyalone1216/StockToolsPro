@@ -74,7 +74,10 @@ def TW_StockSignal():
         data['Date'] = data['Date'].astype('datetime64[s]')
         """
         data = pd.read_csv(os.path.join(stockDataPath, stock))
-        data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
+        if 'Date' in data.columns:
+            data['Date'] = pd.to_datetime(data['Date']).dt.tz_localize(None)
+        elif 'Datetime' in data.columns:
+            data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
 
         _, bottoms = rw_extremes(data['Close'].to_numpy(), 15)
         tops, _ = rw_extremes(data['Close'].to_numpy(), 20)
@@ -110,8 +113,12 @@ def TW_StockSignal():
 def check_signals(file_path, day):
     df = pd.read_csv(file_path)
     # 確保日期以降序排序以獲得最後指定天數
-    df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
-    df.sort_values('Datetime', ascending=False, inplace=True)
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+        df.sort_values('Date', ascending=False, inplace=True)
+    elif 'Datetime' in df.columns:
+        df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
+        df.sort_values('Datetime', ascending=False, inplace=True)
 
     # 提取最後指定天數
     last_days = df.head(day)
@@ -125,8 +132,12 @@ def check_signals(file_path, day):
 
 def extract_signal_details(file_path, day):
     df = pd.read_csv(file_path)
-    df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
-    df.sort_values('Date', ascending=False, inplace=True)
+    if 'Date' in df.columns:
+        df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+        df.sort_values('Date', ascending=False, inplace=True)
+    elif 'Datetime' in df.columns:
+        df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
+        df.sort_values('Datetime', ascending=False, inplace=True)
     last_days = df.head(day)
     buy_signals = last_days[last_days['Buy_Signal'].notna()][['Date', 'Close', 'Buy_Signal']]
     sell_signals = last_days[last_days['Sell_Signal'].notna()][['Date', 'Close', 'Sell_Signal']]
