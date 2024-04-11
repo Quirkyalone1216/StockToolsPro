@@ -60,6 +60,13 @@ def rw_extremes(data: np.array, order: int):
     return tops, bottoms
 
 
+def DateColName(df):
+    if 'Date' in df.columns:
+        return 'Date'
+    elif 'Datetime' in df.columns:
+        return 'Datetime'
+
+
 def TW_StockSignal():
     stockDataPath = r"D:\Temp\StockData\TW_STOCK_DATA\stock_data\Hour_K"
 
@@ -74,13 +81,11 @@ def TW_StockSignal():
         data['Date'] = data['Date'].astype('datetime64[s]')
         """
         data = pd.read_csv(os.path.join(stockDataPath, stock))
-        if 'Date' in data.columns:
-            data['Date'] = pd.to_datetime(data['Date']).dt.tz_localize(None)
-        elif 'Datetime' in data.columns:
-            data['Datetime'] = pd.to_datetime(data['Datetime']).dt.tz_localize(None)
+        DateName = DateColName(data)
 
-        _, bottoms = rw_extremes(data['Close'].to_numpy(), 15)
-        tops, _ = rw_extremes(data['Close'].to_numpy(), 20)
+        data[DateName] = pd.to_datetime(data[DateName]).dt.tz_localize(None)
+        _, bottoms = rw_extremes(data['Close'].to_numpy(), 4)
+        tops, _ = rw_extremes(data['Close'].to_numpy(), 5)
 
         # 標註買賣訊號
         data['Buy_Signal'] = None
@@ -113,12 +118,10 @@ def TW_StockSignal():
 def check_signals(file_path, day):
     df = pd.read_csv(file_path)
     # 確保日期以降序排序以獲得最後指定天數
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
-        df.sort_values('Date', ascending=False, inplace=True)
-    elif 'Datetime' in df.columns:
-        df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
-        df.sort_values('Datetime', ascending=False, inplace=True)
+    DateName = DateColName(df)
+
+    df[DateName] = pd.to_datetime(df[DateName]).dt.tz_localize(None)
+    df.sort_values(DateName, ascending=False, inplace=True)
 
     # 提取最後指定天數
     last_days = df.head(day)
@@ -132,15 +135,12 @@ def check_signals(file_path, day):
 
 def extract_signal_details(file_path, day):
     df = pd.read_csv(file_path)
-    if 'Date' in df.columns:
-        df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
-        df.sort_values('Date', ascending=False, inplace=True)
-    elif 'Datetime' in df.columns:
-        df['Datetime'] = pd.to_datetime(df['Datetime']).dt.tz_localize(None)
-        df.sort_values('Datetime', ascending=False, inplace=True)
+    DateName = DateColName(df)
+    df[DateName] = pd.to_datetime(df[DateName]).dt.tz_localize(None)
+    df.sort_values(DateName, ascending=False, inplace=True)
     last_days = df.head(day)
-    buy_signals = last_days[last_days['Buy_Signal'].notna()][['Date', 'Close', 'Buy_Signal']]
-    sell_signals = last_days[last_days['Sell_Signal'].notna()][['Date', 'Close', 'Sell_Signal']]
+    buy_signals = last_days[last_days['Buy_Signal'].notna()][[DateName, 'Close', 'Buy_Signal']]
+    sell_signals = last_days[last_days['Sell_Signal'].notna()][[DateName, 'Close', 'Sell_Signal']]
     return buy_signals, sell_signals
 
 
@@ -158,7 +158,7 @@ def format_output(buy_list, sell_list, buy_details, sell_details, look_back):
         buy_signals_output += f"- 股票代碼 {stock}:\n"
         for _, row in signals.iterrows():
             # date = row['Date'].date()  # 直接使用Timestamp對象的date方法
-            date = row['Date']  # 直接使用Timestamp對象的date方法
+            date = row[DateColName(signals)]  # 'Series' object
             close_price = f"{row['Close']:.2f}"  # 格式化收盤價至小數點後兩位
             buy_signals_output += f"  日期: {date}, 收盤價: {close_price}, 訊號: {row['Buy_Signal']}\n"
 
@@ -168,7 +168,7 @@ def format_output(buy_list, sell_list, buy_details, sell_details, look_back):
         sell_signals_output += f"- 股票代碼 {stock}:\n"
         for _, row in signals.iterrows():
             # date = row['Date'].date()  # 直接使用Timestamp對象的date方法
-            date = row['Date']  # 直接使用Timestamp對象的date方法
+            date = row[DateColName(signals)]  # 'Series' object
             close_price = f"{row['Close']:.2f}"  # 格式化收盤價至小數點後兩位
             sell_signals_output += f"  日期: {date}, 收盤價: {close_price}, 訊號: {row['Sell_Signal']}\n"
 
