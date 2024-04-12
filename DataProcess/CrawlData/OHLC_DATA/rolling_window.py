@@ -61,14 +61,14 @@ def rw_extremes(data: np.array, order: int):
 
 
 def DateColName(df):
-    if 'Date' in df.columns:
-        return 'Date'
-    elif 'Datetime' in df.columns:
-        return 'Datetime'
+    possible_date_columns = ['Date', 'Datetime', 'date', 'datetime']
+    for col_name in possible_date_columns:
+        if col_name in df.columns:
+            return col_name
 
 
 def TW_StockSignal():
-    stockDataPath = r"D:\Temp\StockData\TW_STOCK_DATA\stock_data\Hour_K"
+    stockDataPath = r"D:\Temp\StockData\TW_STOCK_DATA\stock_data\Daily_K"
 
     outSignalsPath = r"D:\Temp\StockData\TW_STOCK_DATA\tradeSignals"
     if not os.path.exists(outSignalsPath):
@@ -84,8 +84,8 @@ def TW_StockSignal():
         DateName = DateColName(data)
 
         data[DateName] = pd.to_datetime(data[DateName]).dt.tz_localize(None)
-        _, bottoms = rw_extremes(data['Close'].to_numpy(), 4)
-        tops, _ = rw_extremes(data['Close'].to_numpy(), 5)
+        _, bottoms = rw_extremes(data['Close'].to_numpy(), 20)
+        tops, _ = rw_extremes(data['Close'].to_numpy(), 20)
 
         # 標註買賣訊號
         data['Buy_Signal'] = None
